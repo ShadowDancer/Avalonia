@@ -341,10 +341,10 @@ namespace Avalonia.Controls
                 // Make sure that only the target child can be the anchor during the bring into view operation.
                 foreach (var child in _owner.Children)
                 {
-                    ////if (child.CanBeScrollAnchor && child != targetChild)
-                    ////{
-                    ////    child.CanBeScrollAnchor = false;
-                    ////}
+                    if (child != targetChild)
+                    {
+                        _scroller.UnregisterAnchorCandidate(child);
+                    }
                 }
 
                 // Register action to go back to how things were before where any child can be the anchor. Here,
@@ -381,6 +381,16 @@ namespace Avalonia.Controls
         {
             _isBringIntoViewInProgress = false;
             _makeAnchorElement = null;
+
+            foreach (var child in _owner.Children)
+            {
+                var info = ItemsRepeater.GetVirtualizationInfo(child);
+
+                if (info.IsRealized && info.IsHeldByLayout)
+                {
+                    _scroller.RegisterAnchorCandidate(child);
+                }
+            }
 
             // HACK: Invalidate measure now that the anchor has been removed so that a layout can be
             // done with a proper realization rect. This is a hack not present upstream to try to fix
