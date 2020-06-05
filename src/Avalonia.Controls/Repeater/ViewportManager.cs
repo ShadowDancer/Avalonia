@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Avalonia.Controls.Presenters;
 using Avalonia.Layout;
 using Avalonia.Logging;
 using Avalonia.Media;
@@ -395,13 +396,8 @@ namespace Avalonia.Controls
             _ensuredScroller = false;
         }
 
-        private void OnEffectiveViewportChanged(TransformedBounds tb)
+        private void OnEffectiveViewportChanged(Rect effectiveViewport)
         {
-            var globalClip = tb.Clip;
-            var transform = _owner.GetVisualRoot().TransformToVisual(_owner).Value;
-            var clip = globalClip.TransformToAABB(transform);
-            var effectiveViewport = clip.Intersect(tb.Bounds);
-
             Logger.TryGet(LogEventLevel.Verbose)?.Log("Repeater", this, "{LayoutId}: EffectiveViewportChanged event callback", _owner.Layout.LayoutId);
             UpdateViewport(effectiveViewport);
 
@@ -510,74 +506,19 @@ namespace Avalonia.Controls
 
         private IDisposable SubscribeToEffectiveViewportChanged(IControl control)
         {
-            // HACK: This is a bit of a hack. We need the effective viewport of the ItemsRepeater -
-            // we can get this from TransformedBounds, but this property is updated after layout has
-            // run, resulting in the UI being updated too late when scrolling quickly. We can
-            // partially remedey this by triggering also on Bounds changes, but this won't work so 
-            // well for nested ItemsRepeaters.
-            //
-            // UWP uses the EffectiveViewportChanged event (which I think was implemented specially
-            // for this case): we need to implement that in Avalonia.
-            return new EffectiveViewportChangedObservable(control)
-                .Subscribe(OnEffectiveViewportChanged);
+            if (control.VisualParent is ScrollContentPresenter scp)
+            {
+                scp.PreArrange += Scp_ScrollHack;
+                return Disposable.Create(() => scp.PreArrange -= Scp_ScrollHack);
+            }
+
+            return Disposable.Empty;
         }
 
-        private class EffectiveViewportChangedObservable : SingleSubscriberObservableBase<TransformedBounds>,
-            IObserver<TransformedBounds?>,
-            IObserver<Rect>
+        private void Scp_ScrollHack(object sender, EventArgs e)
         {
-            private readonly IControl _control;
-            private IDisposable _subscription;
-            private TransformedBounds? _lastBounds;
-            private bool _skipBounds;
-
-            public EffectiveViewportChangedObservable(IControl control) => _control = control;
-
-            void IObserver<TransformedBounds?>.OnNext(TransformedBounds? value)
-            {
-                _lastBounds = value;
-
-                if (value != null)
-                {
-                    PublishNext(value.Value);
-                }
-            }
-
-            void IObserver<Rect>.OnNext(Rect value)
-            {
-                if (_lastBounds.HasValue)
-                {
-                    if (!_skipBounds)
-                    {
-                        PublishNext(new TransformedBounds(
-                            new Rect(value.Size),
-                            _lastBounds.Value.Clip,
-                            _lastBounds.Value.Transform));
-                    }
-
-                    _skipBounds = false;
-                }
-            }
-
-            protected override void Subscribed()
-            {
-                _subscription = new CompositeDisposable(
-                    _control.GetObservable(Visual.TransformedBoundsProperty).Subscribe(this),
-                    _control.GetObservable(Visual.BoundsProperty).Subscribe(this));
-                _lastBounds = null;
-                _skipBounds = true;
-            }
-
-            protected override void Unsubscribed()
-            {
-                _subscription.Dispose();
-                _subscription = null;
-            }
-
-            void IObserver<TransformedBounds?>.OnCompleted() { }
-            void IObserver<TransformedBounds?>.OnError(Exception error) { }
-            void IObserver<Rect>.OnCompleted() { }
-            void IObserver<Rect>.OnError(Exception error) { }
+            var scp = (ScrollContentPresenter)sender;
+            OnEffectiveViewportChanged(new Rect((Point)scp.Offset, scp.Viewport));
         }
 
         private class ScrollerInfo

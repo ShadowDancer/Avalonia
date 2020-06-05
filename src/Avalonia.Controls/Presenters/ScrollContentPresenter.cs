@@ -89,6 +89,8 @@ namespace Avalonia.Controls.Presenters
             this.GetObservable(ChildProperty).Subscribe(UpdateScrollableSubscription);
         }
 
+        internal event EventHandler<EventArgs> PreArrange;
+
         /// <summary>
         /// Gets or sets a value indicating whether the content can be scrolled horizontally.
         /// </summary>
@@ -174,20 +176,28 @@ namespace Avalonia.Controls.Presenters
         /// <inheritdoc/>
         protected override Size ArrangeOverride(Size finalSize)
         {
+            Size result;
+
+            PreArrange?.Invoke(this, EventArgs.Empty);
+
             if (_logicalScrollSubscription != null || Child == null)
             {
-                return base.ArrangeOverride(finalSize);
+                result = base.ArrangeOverride(finalSize);
+            }
+            else
+            {
+                try
+                {
+                    _arranging = true;
+                    result = ArrangeWithAnchoring(finalSize);
+                }
+                finally
+                {
+                    _arranging = false;
+                }
             }
 
-            try
-            {
-                _arranging = true;
-                return ArrangeWithAnchoring(finalSize);
-            }
-            finally
-            {
-                _arranging = false;
-            }
+            return result;
         }
 
         private Size ArrangeWithAnchoring(Size finalSize)
@@ -205,7 +215,9 @@ namespace Avalonia.Controls.Presenters
                     TranslateBounds(_anchor.control, Child, out var updatedBounds) &&
                     updatedBounds.Position != _anchor.bounds.Position)
                 {
-                    return updatedBounds.Position - _anchor.bounds.Position;
+                    var offset = updatedBounds.Position - _anchor.bounds.Position;
+                    System.Diagnostics.Debug.WriteLine("Shifting due to anchor: " + offset);
+                    return offset;
                 }
 
                 return default;
@@ -417,8 +429,8 @@ namespace Avalonia.Controls.Presenters
             foreach (var element in _anchorCandidates)
             {
                 if (element.IsVisible && 
-                    TranslateBounds(element, this, out var bounds) &&
-                    bounds.Intersects(thisBounds))
+                    TranslateBounds(element, this, out var bounds)/* &&
+                    bounds.Intersects(thisBounds)*/)
                 {
                     var distance = (Vector)bounds.Position;
                     var candidateDistance = Math.Abs(distance.Length);
