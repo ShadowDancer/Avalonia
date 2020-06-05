@@ -3,6 +3,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
 {
@@ -194,6 +195,7 @@ namespace Avalonia.Controls
         {
             HorizontalScrollBarVisibilityProperty.Changed.AddClassHandler<ScrollViewer>((x, e) => x.ScrollBarVisibilityChanged(e));
             VerticalScrollBarVisibilityProperty.Changed.AddClassHandler<ScrollViewer>((x, e) => x.ScrollBarVisibilityChanged(e));
+            RequestBringIntoViewEvent.AddClassHandler<ScrollViewer>((x, e) => x.BringIntoViewRequested(e));
         }
 
         /// <summary>
@@ -570,6 +572,77 @@ namespace Avalonia.Controls
                 SetAndRaise(SmallChangeProperty, ref _smallChange, new Size(DefaultSmallChange, DefaultSmallChange));
                 SetAndRaise(LargeChangeProperty, ref _largeChange, Viewport);
             }
+        }
+
+        private void BringIntoViewRequested(RequestBringIntoViewEventArgs e)
+        {
+            e.Handled = BringDescendantIntoView(e.TargetObject, e.TargetRect);
+        }
+
+        /// <summary>
+        /// Attempts to bring a portion of the target visual into view by scrolling the content.
+        /// </summary>
+        /// <param name="target">The target visual.</param>
+        /// <param name="targetRect">The portion of the target visual to bring into view.</param>
+        /// <returns>True if the scroll offset was changed; otherwise false.</returns>
+        private bool BringDescendantIntoView(IVisual target, Rect targetRect)
+        {
+            var child = Presenter?.Child;
+
+            if (child is null || !child.IsEffectivelyVisible)
+            {
+                return false;
+            }
+
+            var scrollable = Presenter.Child as ILogicalScrollable;
+            var control = target as IControl;
+
+            if (scrollable?.IsLogicalScrollEnabled == true && control != null)
+            {
+                return scrollable.BringIntoView(control, targetRect);
+            }
+
+            var transform = target.TransformToVisual(child);
+
+            if (transform == null)
+            {
+                return false;
+            }
+
+            var rect = targetRect.TransformToAABB(transform.Value);
+            var offset = Offset;
+            var result = false;
+
+            if (rect.Bottom > offset.Y + Viewport.Height)
+            {
+                offset = offset.WithY((rect.Bottom - Viewport.Height) + child.Margin.Top);
+                result = true;
+            }
+
+            if (rect.Y < offset.Y)
+            {
+                offset = offset.WithY(rect.Y);
+                result = true;
+            }
+
+            if (rect.Right > offset.X + Viewport.Width)
+            {
+                offset = offset.WithX((rect.Right - Viewport.Width) + child.Margin.Left);
+                result = true;
+            }
+
+            if (rect.X < offset.X)
+            {
+                offset = offset.WithX(rect.X);
+                result = true;
+            }
+
+            if (result)
+            {
+                Offset = offset;
+            }
+
+            return result;
         }
 
         protected override void OnKeyDown(KeyEventArgs e)

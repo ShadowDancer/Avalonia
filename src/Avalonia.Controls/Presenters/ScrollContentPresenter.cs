@@ -84,7 +84,6 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         public ScrollContentPresenter()
         {
-            AddHandler(RequestBringIntoViewEvent, BringIntoViewRequested);
             AddHandler(Gestures.ScrollGestureEvent, OnScrollGesture);
 
             this.GetObservable(ChildProperty).Subscribe(UpdateScrollableSubscription);
@@ -137,70 +136,6 @@ namespace Avalonia.Controls.Presenters
 
         /// <inheritdoc/>
         IControl IScrollAnchorProvider.CurrentAnchor => _anchor.control;
-
-        /// <summary>
-        /// Attempts to bring a portion of the target visual into view by scrolling the content.
-        /// </summary>
-        /// <param name="target">The target visual.</param>
-        /// <param name="targetRect">The portion of the target visual to bring into view.</param>
-        /// <returns>True if the scroll offset was changed; otherwise false.</returns>
-        public bool BringDescendantIntoView(IVisual target, Rect targetRect)
-        {
-            if (Child?.IsEffectivelyVisible != true)
-            {
-                return false;
-            }
-
-            var scrollable = Child as ILogicalScrollable;
-            var control = target as IControl;
-
-            if (scrollable?.IsLogicalScrollEnabled == true && control != null)
-            {
-                return scrollable.BringIntoView(control, targetRect);
-            }
-
-            var transform = target.TransformToVisual(Child);
-
-            if (transform == null)
-            {
-                return false;
-            }
-
-            var rect = targetRect.TransformToAABB(transform.Value);
-            var offset = Offset;
-            var result = false;
-
-            if (rect.Bottom > offset.Y + Viewport.Height)
-            {
-                offset = offset.WithY((rect.Bottom - Viewport.Height) + Child.Margin.Top);
-                result = true;
-            }
-
-            if (rect.Y < offset.Y)
-            {
-                offset = offset.WithY(rect.Y);
-                result = true;
-            }
-
-            if (rect.Right > offset.X + Viewport.Width)
-            {
-                offset = offset.WithX((rect.Right - Viewport.Width) + Child.Margin.Left);
-                result = true;
-            }
-
-            if (rect.X < offset.X)
-            {
-                offset = offset.WithX(rect.X);
-                result = true;
-            }
-
-            if (result)
-            {
-                Offset = offset;
-            }
-
-            return result;
-        }
 
         /// <inheritdoc/>
         void IScrollAnchorProvider.RegisterAnchorCandidate(IControl element)
@@ -405,11 +340,6 @@ namespace Avalonia.Controls.Presenters
             }
 
             base.OnPropertyChanged(change);
-        }
-
-        private void BringIntoViewRequested(object sender, RequestBringIntoViewEventArgs e)
-        {
-            e.Handled = BringDescendantIntoView(e.TargetObject, e.TargetRect);
         }
 
         private void ChildChanged(AvaloniaPropertyChangedEventArgs e)

@@ -283,57 +283,6 @@ namespace Avalonia.Controls.UnitTests.Presenters
             Assert.False(target.IsArrangeValid);
         }
 
-        [Fact]
-        public void BringDescendantIntoView_Should_Update_Offset()
-        {
-            var target = new ScrollContentPresenter
-            {
-                Width = 100,
-                Height = 100,
-                Content = new Border
-                {
-                    Width = 200,
-                    Height = 200,
-                }
-            };
-
-            target.UpdateChild();
-            target.Measure(Size.Infinity);
-            target.Arrange(new Rect(0, 0, 100, 100));
-            target.BringDescendantIntoView(target.Child, new Rect(200, 200, 0, 0));
-
-            Assert.Equal(new Vector(100, 100), target.Offset);
-        }
-
-        [Fact]
-        public void BringDescendantIntoView_Should_Handle_Child_Margin()
-        {
-            Border border;
-            var target = new ScrollContentPresenter
-            {
-                CanHorizontallyScroll = true,
-                CanVerticallyScroll = true,
-                Width = 100,
-                Height = 100,
-                Content = new Decorator
-                {
-                    Margin = new Thickness(50),
-                    Child = border = new Border
-                    {
-                        Width = 200,
-                        Height = 200,
-                    }
-                }
-            };
-
-            target.UpdateChild();
-            target.Measure(Size.Infinity);
-            target.Arrange(new Rect(0, 0, 100, 100));
-            target.BringDescendantIntoView(border, new Rect(200, 200, 0, 0));
-
-            Assert.Equal(new Vector(150, 150), target.Offset);
-        }
-
         private class TestControl : Control
         {
             public Size AvailableSize { get; private set; }

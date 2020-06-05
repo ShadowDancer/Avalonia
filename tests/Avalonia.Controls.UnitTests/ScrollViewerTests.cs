@@ -237,6 +237,60 @@ namespace Avalonia.Controls.UnitTests
             Assert.Equal(1, raised);
         }
 
+        [Fact]
+        public void BringIntoView_Should_Update_Offset()
+        {
+            Border border;
+            var target = new ScrollViewer
+            {
+                Width = 100,
+                Height = 100,
+                Content = border = new Border
+                {
+                    Width = 200,
+                    Height = 200,
+                },
+                Template = new FuncControlTemplate<ScrollViewer>(CreateTemplate),
+            };
+
+            target.ApplyTemplate();
+            ((ContentPresenter)target.Presenter).UpdateChild();
+            target.Measure(Size.Infinity);
+            target.Arrange(new Rect(0, 0, 100, 100));
+            border.BringIntoView(new Rect(200, 200, 0, 0));
+
+            Assert.Equal(new Vector(100, 100), target.Offset);
+        }
+
+        [Fact]
+        public void BringDescendantIntoView_Should_Handle_Child_Margin()
+        {
+            Border border;
+            var target = new ScrollViewer
+            {
+                Width = 100,
+                Height = 100,
+                Content = new Decorator
+                {
+                    Margin = new Thickness(50),
+                    Child = border = new Border
+                    {
+                        Width = 200,
+                        Height = 200,
+                    }
+                },
+                Template = new FuncControlTemplate<ScrollViewer>(CreateTemplate),
+            };
+
+            target.ApplyTemplate();
+            ((ContentPresenter)target.Presenter).UpdateChild();
+            target.Measure(Size.Infinity);
+            target.Arrange(new Rect(0, 0, 100, 100));
+            border.BringIntoView(new Rect(200, 200, 0, 0));
+
+            Assert.Equal(new Vector(150, 150), target.Offset);
+        }
+
         private Control CreateTemplate(ScrollViewer control, INameScope scope)
         {
             return new Grid
@@ -261,6 +315,7 @@ namespace Avalonia.Controls.UnitTests
                         [~~ScrollContentPresenter.OffsetProperty] = control[~~ScrollViewer.OffsetProperty],
                         [~~ScrollContentPresenter.ViewportProperty] = control[~~ScrollViewer.ViewportProperty],
                         [~ScrollContentPresenter.CanHorizontallyScrollProperty] = control[~ScrollViewer.CanHorizontallyScrollProperty],
+                        [~ScrollContentPresenter.CanVerticallyScrollProperty] = control[~ScrollViewer.CanVerticallyScrollProperty],
                     }.RegisterInNameScope(scope),
                     new ScrollBar
                     {
